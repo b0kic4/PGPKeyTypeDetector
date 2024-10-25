@@ -1,82 +1,14 @@
 package main
 
 import (
-	"crypto/ecdsa"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
-	"errors"
+	keydet "DetectAlg/key_det"
 	"fmt"
-	"strings"
 )
 
-type KeysData struct {
-	EcPub   string
-	EcPriv  string
-	RsaPub  string
-	RsaPriv string
-}
-
-type KeyTypeDetection struct{}
-
-func (kd *KeyTypeDetection) DetectKeyType(keyData string) (string, error) {
-	keyData = cleanKeyData(keyData)
-
-	block, _ := pem.Decode([]byte(keyData))
-	if block == nil {
-		return "", errors.New("failed to decode PEM block")
-	}
-
-	switch block.Type {
-	case "PGP PUBLIC KEY", "PUBLIC KEY":
-		if pubKey, err := x509.ParsePKIXPublicKey(block.Bytes); err == nil {
-			switch pubKey.(type) {
-			case *rsa.PublicKey:
-				return "RSA Public Key (PKIX Format)", nil
-			case *ecdsa.PublicKey:
-				return "ECC Public Key", nil
-			default:
-				return "Unknown Public Key Type", nil
-			}
-		}
-
-		if _, err := x509.ParsePKCS1PublicKey(block.Bytes); err == nil {
-			return "RSA Public Key (PKCS1 Format)", nil
-		}
-
-		return "", errors.New("failed to parse public key (use ParsePKCS1PublicKey instead for this key format)")
-
-	case "PGP PRIVATE KEY", "PRIVATE KEY", "RSA PRIVATE KEY":
-		if _, err := x509.ParseECPrivateKey(block.Bytes); err == nil {
-			return "ECC Private Key", nil
-		}
-
-		if _, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
-			return "RSA Private Key (PKCS1 Format)", nil
-		}
-
-		if privKey, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
-			switch privKey.(type) {
-			case *rsa.PrivateKey:
-				return "RSA Private Key (PKCS8 Format)", nil
-			case *ecdsa.PrivateKey:
-				return "ECC Private Key", nil
-			}
-		}
-
-		return "", errors.New("failed to parse private key")
-
-	default:
-		return "", errors.New("unknown key format")
-	}
-}
-
-func cleanKeyData(keyData string) string {
-	return strings.TrimSpace(keyData)
-}
-
 func main() {
-	myKeys := KeysData{
+	pgpKd := keydet.KeyTypeDetection{}
+
+	myKeys := keydet.KeysData{
 		EcPub: `-----BEGIN PGP PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2X6UZ3awWndzx8C97fPnaNpIx6ZQ
 K7GcNvbYYL7OlS4z5/LsAx5ZEludUNBWA4OezA6gD4ZXvk5FSA3l3fDr6w==
@@ -158,26 +90,25 @@ xOQOsvL2XkV5VZcW0cFbuPIavvuPUUoKAHX2sMWPyHsGBk4BFIL65MKI7TQ0qw==
 
 	fmt.Println(myKeys)
 
-	kd := KeyTypeDetection{}
-	if keyType, err := kd.DetectKeyType(myKeys.EcPub); err == nil {
+	if keyType, err := pgpKd.DetectKeyType(myKeys.EcPub); err == nil {
 		fmt.Println("ECC Public Key Type:", keyType)
 	} else {
 		fmt.Println("Error detecting ECC public key type:", err)
 	}
 
-	if keyType, err := kd.DetectKeyType(myKeys.EcPriv); err == nil {
+	if keyType, err := pgpKd.DetectKeyType(myKeys.EcPriv); err == nil {
 		fmt.Println("ECC Private Key Type:", keyType)
 	} else {
 		fmt.Println("Error detecting ECC private key type:", err)
 	}
 
-	if keyType, err := kd.DetectKeyType(myKeys.RsaPub); err == nil {
+	if keyType, err := pgpKd.DetectKeyType(myKeys.RsaPub); err == nil {
 		fmt.Println("RSA Public Key Type:", keyType)
 	} else {
 		fmt.Println("Error detecting RSA public key type:", err)
 	}
 
-	if keyType, err := kd.DetectKeyType(myKeys.RsaPriv); err == nil {
+	if keyType, err := pgpKd.DetectKeyType(myKeys.RsaPriv); err == nil {
 		fmt.Println("RSA Private Key Type:", keyType)
 	} else {
 		fmt.Println("Error detecting RSA private key type:", err)
